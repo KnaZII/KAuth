@@ -22,12 +22,11 @@ import java.util.Map;
 
 public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter {
 
-    private final KAuth plugin; // Ссылка на основной класс плагина
+    private final KAuth plugin;
     private final FileConfiguration config;
-    private final Map<Player, String> registrationMap; // Сохраняем игроков, ожидающих ввода Telegram ID
-    private final Map<Player, String> tempPlayerData; // Сохраняем данные временно для игроков
+    private final Map<Player, String> registrationMap;
+    private final Map<Player, String> tempPlayerData;
 
-    // Конструктор, принимающий основной класс плагина
     public ToolAuthRegister(KAuth plugin) {
         this.plugin = plugin;
         this.config = plugin.getConfig();
@@ -44,7 +43,6 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("toolauth")) {
-            // Проверка, если команда введена без аргументов
             if (args.length == 0) {
                 sender.sendMessage("§x§F§F§B§4§4§0§l|");
                 sender.sendMessage("§x§F§F§B§4§4§0§l|");
@@ -53,14 +51,13 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
                 sender.sendMessage("§x§F§F§B§4§4§0§l|      §cУкажите комманду для использования плагина!");
                 sender.sendMessage("§x§F§F§B§4§4§0§l|");
                 sender.sendMessage("§x§F§F§B§4§4§0§l|          §cПлагин §eнаходится §cна бета разработке.");
-                sender.sendMessage("§x§F§F§B§4§4§0§l|              §cТелеграм создателя: §e@pogostik");
+                sender.sendMessage("§x§F§F§B§4§4§0§l|              §cТелеграм создателя: §e@DeepseekIRL");
                 sender.sendMessage("§x§F§F§B§4§4§0§l|");
                 sender.sendMessage("§x§F§F§B§4§4§0§l|");
                 return true;
             }
 
             if (args.length > 0 && args[0].equalsIgnoreCase("register")) {
-                // Проверка прав на выполнение команды
                 if (!(sender instanceof Player) || !sender.hasPermission("toolauth.register")) {
                     for (int i = 0; i < 20; i++) {
                         sender.sendMessage("");
@@ -89,7 +86,6 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
                     Player targetPlayer = Bukkit.getPlayer(playerName);
 
                     if (targetPlayer != null) {
-                        // Настройка для целевого игрока
                         for (int i = 0; i < 20; i++) {
                             targetPlayer.sendMessage("");
                         }
@@ -100,11 +96,11 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
                         targetPlayer.sendMessage("");
 
                         targetPlayer.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false));
-                        targetPlayer.setWalkSpeed(0); // Блокируем движение
-                        targetPlayer.setAllowFlight(false); // Запрещаем полет
+                        targetPlayer.setWalkSpeed(0);
+                        targetPlayer.setAllowFlight(false);
 
                         registrationMap.put(targetPlayer, "waiting_for_telegram_id");
-                        tempPlayerData.put(targetPlayer, playerName); // Сохраняем имя игрока для дальнейшей обработки
+                        tempPlayerData.put(targetPlayer, playerName);
                         for (int i = 0; i < 20; i++) {
                             admin.sendMessage("");
                         }
@@ -151,18 +147,15 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
 
-        // Проверка, находится ли игрок в процессе регистрации
         if (registrationMap.containsKey(player)) {
             String state = registrationMap.get(player);
 
-            // Если ожидается ввод Telegram ID
             if (state.equals("waiting_for_telegram_id")) {
                 String telegramId = event.getMessage();
-                String playerName = tempPlayerData.get(player); // Получаем ник игрока
+                String playerName = tempPlayerData.get(player);
 
-                // Сохраняем Telegram ID в конфигурацию
                 config.set("Пользователи." + playerName + ".Телеграмм айди", telegramId);
-                plugin.saveConfig(); // Сохраняем изменения в конфигурации
+                plugin.saveConfig();
 
                 for (int i = 0; i < 20; i++) {
                     player.sendMessage("");
@@ -172,17 +165,16 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
                 player.sendMessage(" §x§F§F§A§4§3§E§l⎝ §fВаш §b§nTelegramID§a " + telegramId);
                 player.sendMessage("");
 
-                // Убираем эффект слепоты и восстанавливаем возможность двигаться
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     player.removePotionEffect(PotionEffectType.BLINDNESS);
-                    player.setWalkSpeed(0.2f); // Восстанавливаем скорость
-                    player.setAllowFlight(false); // Запрещаем полет
+                    player.setWalkSpeed(0.2f);
+                    player.setAllowFlight(false);
 
-                    registrationMap.remove(player); // Удаляем игрока из процесса регистрации
-                    tempPlayerData.remove(player); // Удаляем временные данные
+                    registrationMap.remove(player);
+                    tempPlayerData.remove(player);
                 });
 
-                event.setCancelled(true); // Отменяем событие чата
+                event.setCancelled(true);
             }
         }
     }
@@ -191,7 +183,7 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
         if (registrationMap.containsKey(player)) {
-            event.setCancelled(true); // Блокируем движение
+            event.setCancelled(true);
         }
     }
 
@@ -199,7 +191,7 @@ public class ToolAuthRegister implements CommandExecutor, Listener, TabCompleter
     public void onPlayerTeleport(PlayerTeleportEvent event) {
         Player player = event.getPlayer();
         if (registrationMap.containsKey(player)) {
-            event.setCancelled(true); // Блокируем телепортацию
+            event.setCancelled(true);
         }
     }
 }

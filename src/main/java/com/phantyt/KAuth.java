@@ -32,28 +32,25 @@ import java.util.UUID;
 public final class KAuth extends JavaPlugin implements Listener {
 
     private FileConfiguration config;
-    private Map<UUID, BossBar> bossBars = new HashMap<>(); // Хранение BossBar для игроков
+    private Map<UUID, BossBar> bossBars = new HashMap<>();
     private Map<UUID, Boolean> playerStartStatus = new HashMap<>();
-    private Map<UUID, Integer> timerTasks = new HashMap<>(); // Хранение ID задач таймера
-    private Map<UUID, String> authCodes = new HashMap<>(); // Хранение кодов для игроков
-    private Map<UUID, Boolean> authenticatedPlayers = new HashMap<>(); // Хранение статуса аутентификации игроков
-    private Map<UUID, Integer> taskIds = new HashMap<>(); // Хранение ID задач уведомления
+    private Map<UUID, Integer> timerTasks = new HashMap<>();
+    private Map<UUID, String> authCodes = new HashMap<>();
+    private Map<UUID, Boolean> authenticatedPlayers = new HashMap<>();
+    private Map<UUID, Integer> taskIds = new HashMap<>();
 
     private static final String CHARACTERS = "8073380657:AAHPLuU8mNi4mGzWMnnWdNlAdHtVQZUhdL8";
-    private static final String TELEGRAM_API_URL = "https://api.telegram.org/bot"; // Базовый URL для Telegram Bot API
+    private static final String TELEGRAM_API_URL = "https://api.telegram.org/bot";
 
     @Override
     public void onEnable() {
-        // Загрузка конфигурации
         saveDefaultConfig();
         config = getConfig();
         ToolAuthRegister toolAuthRegister = new ToolAuthRegister(this);
         toolAuthRegister.onEnable();
 
-        // Регистрация событий
         getServer().getPluginManager().registerEvents(this, this);
 
-        // Запуск периодической проверки прав
         startPermissionsCheckTask();
     }
 
@@ -62,7 +59,6 @@ public final class KAuth extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         if (authenticatedPlayers.getOrDefault(player.getUniqueId(), true)) return;
 
-        // Блокировка движения
         event.setCancelled(true);
     }
 
@@ -71,7 +67,6 @@ public final class KAuth extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         if (authenticatedPlayers.getOrDefault(player.getUniqueId(), true)) return;
 
-        // Блокировка выполнения команд
         event.setCancelled(true);
         player.sendMessage("  §x§8§0§0§0§0§0§lK§x§9§D§1§1§1§1§lA§x§B§A§2§2§2§2§lᴜ§x§D§7§3§3§3§3§lᴛ§x§F§F§4§4§4§4§lʜ");
         player.sendMessage(" §x§F§F§A§4§3§E§l⎛ §fВы §c§nне можете §fиспользовать комманды!");
@@ -83,15 +78,12 @@ public final class KAuth extends JavaPlugin implements Listener {
     public void onAsyncPlayerChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
 
-        // Проверка, требуется ли аутентификация
         if (!authenticatedPlayers.getOrDefault(player.getUniqueId(), true)) {
             String message = event.getMessage();
 
-            // Блокируем отправку в чат и проверяем длину кода
             event.setCancelled(true);
 
             if (message.length() == 15 && authCodes.containsKey(player.getUniqueId())) {
-                // Проверка кода
                 if (checkAuthCode(player, message)) {
                     authenticatedPlayers.put(player.getUniqueId(), true);
                     for (int i = 0; i < 20; i++) {
@@ -103,15 +95,13 @@ public final class KAuth extends JavaPlugin implements Listener {
                     player.sendMessage(" §x§F§F§A§4§3§E§l⎝ §bУдачной вам игры.");
                     player.sendMessage("");
 
-                    // Запускаем синхронную задачу для снятия слепоты
                     Bukkit.getScheduler().runTask(this, () -> {
                         player.removePotionEffect(PotionEffectType.BLINDNESS);
                         player.sendTitle("", "", 0, 0, 0);
                     });
 
-                    // Останавливаем уведомления
                     stopNotificationTask(player);
-                    stopTimer(player); // Остановка таймера
+                    stopTimer(player);
                 } else {
                     for (int i = 0; i < 20; i++) {
                         player.sendMessage("");
@@ -133,7 +123,6 @@ public final class KAuth extends JavaPlugin implements Listener {
         }
     }
 
-    // Периодическая проверка прав игроков
     private void startPermissionsCheckTask() {
         new BukkitRunnable() {
             @Override
@@ -142,19 +131,17 @@ public final class KAuth extends JavaPlugin implements Listener {
                     checkPermissions(player);
                 }
             }
-        }.runTaskTimer(this, 0L, 20L); // Проверка каждые 20 тиков (~1 секунда)
+        }.runTaskTimer(this, 0L, 20L);
     }
 
-    // Проверка прав при входе
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // Телепортируем игрока на землю, если он в воздухе
         Bukkit.getScheduler().runTask(this, () -> {
             Location loc = player.getLocation();
-            if (!player.isOnGround()) { // Проверяем, находится ли игрок на земле
-                Location groundLoc = findGroundLocation(loc); // Находим ближайшую твёрдую поверхность
+            if (!player.isOnGround()) {
+                Location groundLoc = findGroundLocation(loc);
                 if (groundLoc != null) {
                     player.teleport(groundLoc);
                     player.sendMessage(ChatColor.YELLOW + "Вы были телепортированы на землю для прохождения проверки.");
@@ -162,89 +149,69 @@ public final class KAuth extends JavaPlugin implements Listener {
             }
         });
 
-        // Запускаем проверку аутентификации
         checkPermissions(player);
     }
 
-    // Метод для поиска ближайшей твёрдой поверхности под игроком
     private Location findGroundLocation(Location startLoc) {
         Location loc = startLoc.clone();
-        while (loc.getY() > loc.getWorld().getMinHeight()) { // Проверяем до минимальной высоты мира
-            loc.subtract(0, 1, 0); // Спускаемся на 1 блок вниз
-            if (loc.getBlock().getType().isSolid()) { // Если блок твёрдый
-                loc.add(0, 1, 0); // Поднимаемся на 1 блок выше, чтобы игрок стоял на поверхности
+        while (loc.getY() > loc.getWorld().getMinHeight()) {
+            loc.subtract(0, 1, 0);
+            if (loc.getBlock().getType().isSolid()) {
+                loc.add(0, 1, 0);
                 return loc;
             }
         }
-        return null; // Если не нашли твёрдую поверхность, возвращаем null (можно настроить запасной вариант)
+        return null;
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
-        // Сбрасываем состояние аутентификации игрока
         authenticatedPlayers.remove(player.getUniqueId());
-        authCodes.remove(player.getUniqueId()); // Удаляем код, если он есть
+        authCodes.remove(player.getUniqueId());
     }
 
     private void checkPermissions(Player player) {
-        // Проверка токена
         String botToken = config.getString("Токен бота телеграмм");
 
-        // Если токен не указан
         if (botToken == null || botToken.isEmpty()) {
-            // Если у игрока нет админских прав
             if (!isAdministrator(player) && !player.isOp()) {
                 player.sendMessage(ChatColor.RED + "Вам не разрешен доступ к серверу.");
                 player.kickPlayer(ChatColor.RED + "Вам не разрешен доступ к серверу.");
                 return; // Кик игрока
             }
-            // Если у игрока есть админские права, но токен не указан, не кикаем
             return;
         }
 
-        // Проверка, есть ли игрок в списке пользователей
         if (getTelegramId(player.getName()) == null) {
-            // Если игрок не в списке пользователей, и у него есть админские права
             if (isAdministrator(player) || player.isOp()) {
                 player.sendMessage(ChatColor.RED + "Вам не разрешен доступ к серверу.");
                 player.kickPlayer(ChatColor.RED + "Вам не разрешен доступ к серверу.");
             }
-            // Если у игрока нет админских прав, не кикаем
             return;
         }
 
-        // Проверка админских прав и OP
         if (isAdministrator(player) || player.isOp()) {
-            // Проверка, нужно ли выполнять аутентификацию
             if (!authenticatedPlayers.getOrDefault(player.getUniqueId(), false)) {
-                // Если код ещё не отправлялся
                 if (!authCodes.containsKey(player.getUniqueId())) {
                     String authCode = generateAuthCode();
                     authCodes.put(player.getUniqueId(), authCode);
                     sendAuthCodeToTelegram(getTelegramId(player.getName()), player, authCode);
 
-                    // Проигрываем звук начала проверки
                     player.playSound(player.getLocation(), Sound.ENTITY_DOLPHIN_DEATH, 1.0f, 1.0f);
 
-                    // Наложение эффекта слепоты
                     player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false));
 
-                    // Постоянное сообщение на экране
                     player.sendTitle(ChatColor.RED + "§x§F§F§D§E§5§8☁ §x§F§F§D§A§5§8ᴛ§x§F§F§D§6§5§7ᴇ§x§F§F§D§2§5§7ʟ§x§F§F§C§E§5§6ᴇ§x§F§F§C§A§5§6ɢ§x§F§F§C§6§5§5ʀ§x§F§F§C§3§5§5ᴀ§x§F§F§B§F§5§4ᴍ§x§F§F§B§B§5§4-§x§F§F§B§7§5§3ᴀ§x§F§F§B§3§5§3ᴘ§x§F§F§A§F§5§2ɪ §x§F§F§A§7§5§1☁", ChatColor.YELLOW + "§x§F§F§D§E§5§8К вам в телеграмм пришёл код.", 10, Integer.MAX_VALUE, 0);
 
-                    // Отключение движений и команд
                     authenticatedPlayers.put(player.getUniqueId(), false);
 
-                    // Начинаем отправлять уведомления
                     startNotificationTask(player);
 
-                    // Запускаем таймер
                     startTimer(player);
                 }
             }
         } else {
-            // Если у игрока были админские права, но они пропали
             if (authenticatedPlayers.containsKey(player.getUniqueId())) {
                 authenticatedPlayers.remove(player.getUniqueId());
             }
@@ -256,7 +223,6 @@ public final class KAuth extends JavaPlugin implements Listener {
         UUID playerId = player.getUniqueId();
         String botLink = config.getString("Ссылка на бота");
 
-        // Явное определение внутреннего класса
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -301,20 +267,17 @@ public final class KAuth extends JavaPlugin implements Listener {
                     player.kickPlayer(ChatColor.RED + "Вы не успели ввести код аутентификации.");
                     cancel();
                 } else {
-                    // Создаем сообщение с цветом §6
                     String actionBarMessage =
-                            ChatColor.GOLD + "☁ " + // Цвет §6
-                                    "ᴛɪᴍᴇ - " + timeLeft + "с " + // Время осталось
-                                    "☁"; // Завершающий символ
+                            ChatColor.GOLD + "☁ " +
+                                    "ᴛɪᴍᴇ - " + timeLeft + "с " +
+                                    "☁";
 
-                    // Отправляем сообщение в Action Bar
                     player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(actionBarMessage));
                     timeLeft--;
                 }
             }
-        }.runTaskTimer(this, 0, 20).getTaskId(); // Обновление каждую секунду
+        }.runTaskTimer(this, 0, 20).getTaskId();
 
-        // Сохраняем ID задачи таймера
         timerTasks.put(playerId, taskId);
     }
 
@@ -348,7 +311,6 @@ public final class KAuth extends JavaPlugin implements Listener {
     }
 
     private String getTelegramId(String playerName) {
-        // Проверяем, есть ли пользователь в конфигурации
         if (config.contains("Пользователи." + playerName)) {
             return config.getString("Пользователи." + playerName + ".Телеграмм айди");
         }
@@ -356,7 +318,6 @@ public final class KAuth extends JavaPlugin implements Listener {
     }
 
 
-    // Метод для генерации кода длиной 15 символов
     private String generateAuthCode() {
         SecureRandom random = new SecureRandom();
         StringBuilder code = new StringBuilder();
@@ -372,7 +333,7 @@ public final class KAuth extends JavaPlugin implements Listener {
     public boolean checkAuthCode(Player player, String code) {
         String storedCode = authCodes.get(player.getUniqueId());
         if (storedCode != null && storedCode.equals(code)) {
-            authCodes.remove(player.getUniqueId()); // Удаление кода после успешной аутентификации
+            authCodes.remove(player.getUniqueId());
             return true;
         }
         return false;
@@ -381,25 +342,21 @@ public final class KAuth extends JavaPlugin implements Listener {
     private void sendAuthCodeToTelegram(String telegramId, Player player, String authCode) {
         String botToken = config.getString("Токен бота телеграмм");
 
-        // Получаем дату и время
         String currentDateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
 
-        // Получаем IP-адрес игрока
         String ipAddress = player.getAddress().getAddress().getHostAddress();
 
-        // Формируем сообщение
         String message = "🌟 Внимание, администратор! 🌟\n" +
                 "🔒 Вы только что выполнили вход с вашего администраторского аккаунта!\n\n" +
                 "📅 Дата и время: " + currentDateTime + "\n" +
                 "🌐 IP-адрес: " + ipAddress + "\n\n" +
-                "🚀 Ваш код для подтверждения: `" + authCode + "`\n\n" + // Используем обратные кавычки для выделения
+                "🚀 Ваш код для подтверждения: `" + authCode + "`\n\n" +
                 "✅ Если это были вы, вы можете продолжать свою работу!\n" +
                 "❌ Если это не вы, немедленно свяжитесь с нашей службой поддержки. Безопасность вашего аккаунта — наш приоритет!\n\n" +
                 "🛡️ Служба поддержки - @DeepseekIRL\n" +
                 "🛡️ Спасибо, что остаетесь с нами!";
 
         try {
-            // URL для отправки сообщения
             URL url = new URL(TELEGRAM_API_URL + botToken + "/sendMessage");
 
             // Создание соединения
@@ -409,7 +366,7 @@ public final class KAuth extends JavaPlugin implements Listener {
             connection.setRequestProperty("Content-Type", "application/json");
 
             // Тело запроса
-            String jsonPayload = "{\"chat_id\":\"" + telegramId + "\",\"text\":\"" + message + "\",\"parse_mode\":\"Markdown\"}"; // Указываем разметку
+            String jsonPayload = "{\"chat_id\":\"" + telegramId + "\",\"text\":\"" + message + "\",\"parse_mode\":\"Markdown\"}";
 
             // Отправка запроса
             try (OutputStream os = connection.getOutputStream()) {

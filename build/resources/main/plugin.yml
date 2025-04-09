@@ -1,8 +1,0 @@
-name: KAuth
-version: '1.5-SNAPSHOT'
-main: com.phantyt.KAuth
-api-version: '1.16'
-commands:
-  toolauth:
-    description: "Команды для управления KAuth"
-    usage: "/<command> <subcommand>"
